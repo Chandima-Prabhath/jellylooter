@@ -1,6 +1,6 @@
 # JellyLooter Ultimate
 
-![JellyLooter Icon](https://raw.githubusercontent.com/jlightner/jellylooter/main/icon.png)
+![JellyLooter Icon](https://raw.githubusercontent.com/jlightner86/jellylooter/main/icon.png)
 
 **JellyLooter** is a specialized download manager and synchronization tool designed for Jellyfin users. It allows you to connect to remote Jellyfin servers, browse their contents visually, and download media directly to your local storage.
 

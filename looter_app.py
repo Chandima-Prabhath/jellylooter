@@ -49,14 +49,10 @@ def cache_worker():
     cfg = load_config()
     url = cfg.get('local_server_url')
     key = cfg.get('local_server_key')
-    
-    if not url or not key: 
-        log("Scan Skipped: No Local Server")
-        return
-
+    if not url or not key: log("Scan Skipped: No Local Server"); return
     if scan_progress['running']: return
 
-    log("Starting Local Scan (Chunk Size: 50)...")
+    log("Starting Local Scan (Chunk: 50)...")
     scan_progress = {"running": True, "percent": 0, "current": 0, "total": 0, "status": "Connecting..."}
     
     try:
@@ -65,40 +61,28 @@ def cache_worker():
         if not u_res.ok: raise Exception("Auth Failed")
         uid = u_res.json()[0]['Id']
         
-        # Get Total
         params = {'Recursive': 'true', 'IncludeItemTypes': 'Movie,Series', 'Fields': 'ProviderIds', 'Limit': 0}
         total_res = requests.get(f"{url}/Users/{uid}/Items", headers=headers, params=params).json()
         total_count = total_res.get('TotalRecordCount', 0)
         
-        scan_progress['total'] = total_count
-        scan_progress['status'] = f"Found {total_count} items. Fetching..."
-        
-        new_cache = set()
-        limit = 50 # Micro-chunks for speed/feedback
-        offset = 0
+        scan_progress.update({'total': total_count, 'status': f"Found {total_count}. Fetching..."})
+        new_cache = set(); limit = 50; offset = 0
         
         while offset < total_count:
-            params = {'Recursive': 'true', 'IncludeItemTypes': 'Movie,Series', 'Fields': 'ProviderIds', 'StartIndex': offset, 'Limit': limit}
+            params.update({'StartIndex': offset, 'Limit': limit})
             items = requests.get(f"{url}/Users/{uid}/Items", headers=headers, params=params).json().get('Items',[])
-            
             for i in items:
                 p = i.get('ProviderIds', {})
                 if 'Imdb' in p: new_cache.add(f"imdb_{p['Imdb']}")
                 if 'Tmdb' in p: new_cache.add(f"tmdb_{p['Tmdb']}")
-            
             offset += len(items)
-            scan_progress['current'] = offset
-            scan_progress['percent'] = int((offset / total_count) * 100) if total_count > 0 else 0
+            scan_progress.update({'current': offset, 'percent': int((offset/total_count)*100) if total_count>0 else 0})
             
         local_id_cache = new_cache
         cache_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-        
-        with open(CACHE_FILE, 'w') as f:
-            json.dump({'timestamp': cache_timestamp, 'ids': list(local_id_cache)}, f)
-            
-        log(f"Scan Complete. {len(local_id_cache)} unique IDs.")
+        with open(CACHE_FILE, 'w') as f: json.dump({'timestamp': cache_timestamp, 'ids': list(local_id_cache)}, f)
+        log(f"Scan Complete. {len(local_id_cache)} IDs.")
         scan_progress = {"running": False, "percent": 100, "current": total_count, "total": total_count, "status": "Done"}
-        
     except Exception as e:
         log(f"Scan Failed: {e}")
         scan_progress = {"running": False, "percent": 0, "current": 0, "total": 0, "status": f"Error: {str(e)}"}
@@ -109,11 +93,8 @@ def setup_schedule():
     schedule.every().day.at("03:00").do(lambda: threading.Thread(target=cache_worker).start())
     t = cfg.get('sync_time', "04:00")
     if cfg.get('auto_sync_enabled', True):
-        try:
-            schedule.every().day.at(t).do(sync_job)
-            log(f"Scheduler: Cache 03:00, Sync {t}")
-        except:
-            schedule.every().day.at("04:00").do(sync_job)
+        try: schedule.every().day.at(t).do(sync_job); log(f"Schedule: Cache 03:00, Sync {t}")
+        except: schedule.every().day.at("04:00").do(sync_job)
 
 def format_bytes(size):
     power, n = 2**10, 0
@@ -138,8 +119,7 @@ def worker():
     while True:
         task = task_queue.get()
         if task is None: break
-        global pending_display
-        pending_display = [x for x in pending_display if x['id'] != task['task_id']]
+        global pending_display; pending_display = [x for x in pending_display if x['id'] != task['task_id']]
         try: download_file(task)
         except Exception as e: log(f"Worker Error: {e}")
         task_queue.task_done()
@@ -165,24 +145,20 @@ def download_file(task):
                     while is_paused:
                         with download_lock: active_downloads[tid].update({'status': "Paused", 'speed': "0 KB/s"})
                         time.sleep(1)
-                        start_time = time.time()
-                        downloaded_at_resume = downloaded
+                        start_time = time.time(); downloaded_at_resume = downloaded
                     
                     if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        elapsed = time.time() - start_time
+                        f.write(chunk); downloaded += len(chunk); elapsed = time.time() - start_time
                         if elapsed > 0.5:
                             speed = (downloaded - downloaded_at_resume) / elapsed
                             with download_lock:
                                 active_downloads[tid].update({'current': downloaded, 'speed': f"{format_bytes(speed)}/s", 'status': "Downloading"})
                                 if total_size > 0: active_downloads[tid]['percent'] = int((downloaded / total_size) * 100)
-                        
                         if task['limit'] > 0:
                             target_time = len(chunk) / (task['limit'] * 1024)
                             if (time.time() - (start_time + elapsed)) < target_time: time.sleep(target_time)
 
-        with download_lock:
+        with download_lock: 
             if tid in active_downloads: del active_downloads[tid]
         log(f"Finished: {os.path.basename(task['filepath'])}")
     except Exception as e:
@@ -193,8 +169,12 @@ def download_file(task):
         with download_lock:
             if tid in active_downloads: del active_downloads[tid]
 
+# --- ROUTES ---
 @app.route('/')
 def index(): return render_template('index.html')
+
+@app.route('/changelog')
+def changelog(): return render_template('changelog.html')
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def config_api():
@@ -202,15 +182,7 @@ def config_api():
     return jsonify(load_config())
 
 @app.route('/api/status')
-def status(): 
-    return jsonify({
-        "active": active_downloads, 
-        "pending": pending_display, 
-        "paused": is_paused,
-        "cache_time": cache_timestamp,
-        "cache_count": len(local_id_cache),
-        "scan_progress": scan_progress
-    })
+def status(): return jsonify({"active": active_downloads, "pending": pending_display, "paused": is_paused, "cache_time": cache_timestamp, "cache_count": len(local_id_cache), "scan_progress": scan_progress})
 
 @app.route('/api/logs')
 def get_logs(): return "\n".join(reversed(log_buffer))
@@ -237,16 +209,11 @@ def test_connection():
     except Exception as e: return jsonify({"status": "error", "error": str(e)})
 
 @app.route('/api/rebuild_cache', methods=['POST'])
-def rebuild_cache():
-    threading.Thread(target=cache_worker).start()
-    return jsonify({"status": "started"})
+def rebuild_cache(): threading.Thread(target=cache_worker).start(); return jsonify({"status": "started"})
 
 @app.route('/api/remove_local', methods=['POST'])
 def remove_local():
-    cfg = load_config()
-    cfg['local_server_url'] = ""
-    cfg['local_server_key'] = ""
-    save_config(cfg)
+    cfg = load_config(); cfg['local_server_url'] = ""; cfg['local_server_key'] = ""; save_config(cfg)
     return jsonify({"status": "ok"})
 
 @app.route('/api/scan_libs')
@@ -261,13 +228,11 @@ def scan_libs():
 
 @app.route('/api/browse_remote', methods=['POST'])
 def browse_remote():
-    d = request.json; cfg = load_config()
-    srv = next((s for s in cfg['servers'] if s['id'] == d['server_id']), None)
+    d = request.json; cfg = load_config(); srv = next((s for s in cfg['servers'] if s['id'] == d['server_id']), None)
     if not srv: return jsonify({"items": []})
     try:
         h = get_auth_header(srv['key']); u = requests.get(f"{srv['url']}/Users", headers=h).json()[0]['Id']
-        local_ids = get_existing_ids(None, None) # Uses cache
-        
+        local_ids = get_existing_ids(None, None)
         if d['parent_id'] == 'root':
             items = requests.get(f"{srv['url']}/Users/{u}/Views", headers=h).json().get('Items',[])
             clean = [{"Id": i['Id'], "Name": i['Name'], "IsFolder": True, "HasImage": True} for i in items]
@@ -288,8 +253,7 @@ def browse_remote():
 
 @app.route('/api/batch_download', methods=['POST'])
 def batch_download():
-    d = request.json; cfg = load_config()
-    srv = next((s for s in cfg['servers'] if s['id'] == d['server_id']), None)
+    d = request.json; cfg = load_config(); srv = next((s for s in cfg['servers'] if s['id'] == d['server_id']), None)
     if srv:
         for iid in d['item_ids']:
             tid = generate_id(); pending_display.append({"name": "Resolving...", "id": tid})
@@ -308,25 +272,16 @@ def recursive_resolve(srv, iid, base_path, tid, limit):
             for child in children:
                 sub_tid = generate_id()
                 queue_item(srv, child, base_path, sub_tid, limit)
-        else:
-            queue_item(srv, item, base_path, tid, limit)
-    except Exception as e: 
-        log(f"Resolve Error: {e}")
-        pending_display = [x for x in pending_display if x['id'] != tid]
+        else: queue_item(srv, item, base_path, tid, limit)
+    except Exception as e: log(f"Resolve Error: {e}"); pending_display = [x for x in pending_display if x['id'] != tid]
 
 def queue_item(srv, item, base_path, tid, limit):
     try:
-        safe_name = clean_name(item['Name'])
-        ext = item.get('Container', 'mkv')
+        safe_name = clean_name(item['Name']); ext = item.get('Container', 'mkv')
         if item['Type'] == 'Episode':
-            series = clean_name(item.get('SeriesName', 'Unknown'))
-            s_num = item.get('ParentIndexNumber', 1)
-            e_num = item.get('IndexNumber', 0)
-            rel_path = os.path.join(series, f"Season {s_num}")
-            fname = f"{series} - S{s_num:02}E{e_num:02} - {safe_name}.{ext}"
-        else:
-            rel_path = ""
-            fname = f"{safe_name}.{ext}"
+            series = clean_name(item.get('SeriesName', 'Unknown')); s_num = item.get('ParentIndexNumber', 1); e_num = item.get('IndexNumber', 0)
+            rel_path = os.path.join(series, f"Season {s_num}"); fname = f"{series} - S{s_num:02}E{e_num:02} - {safe_name}.{ext}"
+        else: rel_path = ""; fname = f"{safe_name}.{ext}"
         full_dir = os.path.join(base_path, rel_path)
         if not os.path.exists(full_dir): os.makedirs(full_dir, exist_ok=True)
         fpath = os.path.join(full_dir, fname)
@@ -345,15 +300,12 @@ def browse_local():
     except Exception as e: return jsonify({"error": str(e), "folders": []})
 
 @app.route('/api/sync')
-def trigger_sync():
-    threading.Thread(target=sync_job).start()
-    return "Started"
+def trigger_sync(): threading.Thread(target=sync_job).start(); return "Started"
 
 def sync_job():
     cfg = load_config()
     if not cfg.get('auto_sync_enabled', True): return
-    log("--- Sync Started ---")
-    load_cache_from_disk()
+    log("--- Sync Started ---"); load_cache_from_disk()
     for m in cfg['mappings']:
         srv = next((s for s in cfg['servers'] if s['id'] == m['server_id']), None)
         if not srv: continue
@@ -363,14 +315,11 @@ def sync_job():
             for item in items:
                 p = item.get('ProviderIds', {})
                 if local_id_cache and ((f"imdb_{p.get('Imdb')}" in local_id_cache) or (f"tmdb_{p.get('Tmdb')}" in local_id_cache)): continue
-                tid = generate_id()
-                queue_item(srv, item, m['local_path'], tid, cfg.get('speed_limit_kbs', 0))
+                tid = generate_id(); queue_item(srv, item, m['local_path'], tid, cfg.get('speed_limit_kbs', 0))
         except Exception as e: log(f"Sync Error: {e}")
     log("--- Sync Finished ---")
 
 if __name__ == '__main__':
-    load_cache_from_disk()
-    threading.Thread(target=worker, daemon=True).start()
-    setup_schedule()
-    threading.Thread(target=lambda: (time.sleep(1) or schedule.run_pending() for _ in iter(int, 1)), daemon=True).start()
+    load_cache_from_disk(); threading.Thread(target=worker, daemon=True).start()
+    setup_schedule(); threading.Thread(target=lambda: (time.sleep(1) or schedule.run_pending() for _ in iter(int, 1)), daemon=True).start()
     app.run(host='0.0.0.0', port=5000)

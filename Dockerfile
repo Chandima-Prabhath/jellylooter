@@ -14,7 +14,7 @@ ENV TZ=America/New_York
 WORKDIR /app
 
 # Install dependencies
-RUN pip install --no-cache-install flask requests schedule
+RUN pip install --no-cache-dir flask requests schedule
 
 # Copy application files
 COPY looter_app.py /app/

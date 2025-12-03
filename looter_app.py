@@ -385,7 +385,7 @@ def adjust_workers(new_count):
 
 def worker():
     """Download worker thread"""
-    global active_workers
+    global active_workers, pending_display
     
     while True:
         with worker_lock:
@@ -406,7 +406,6 @@ def worker():
         tid = task['task_id']
         
         with download_lock:
-            global pending_display
             pending_display = [x for x in pending_display if x['id'] != tid]
         
         if tid in cancelled_tasks:
@@ -761,6 +760,7 @@ def resume_dl():
 @app.route('/api/cancel', methods=['POST'])
 @login_required
 def cancel_dl():
+    global pending_display
     data = request.json or {}
     task_id = data.get('task_id')
     cancel_all = data.get('all', False)
@@ -786,7 +786,6 @@ def cancel_dl():
     elif task_id:
         cancelled_tasks.add(task_id)
         with download_lock:
-            global pending_display
             pending_display = [x for x in pending_display if x['id'] != task_id]
         log(f"Cancelled task: {task_id}")
         return jsonify({"status": "cancelled", "task_id": task_id})
@@ -1058,6 +1057,7 @@ def recursive_resolve(server, item_id, base_path, tid, limit):
 
 def queue_item(server, item, base_path, tid, limit):
     """Queue a single item for download"""
+    global pending_display
     try:
         safe_name = clean_name(item['Name'])
         ext = item.get('Container', 'mkv')
@@ -1081,7 +1081,6 @@ def queue_item(server, item, base_path, tid, limit):
         if os.path.exists(filepath):
             log(f"Skipped (exists): {filename}")
             with download_lock:
-                global pending_display
                 pending_display = [x for x in pending_display if x['id'] != tid]
             return
         

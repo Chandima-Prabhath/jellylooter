@@ -713,8 +713,7 @@ def resume_dl():
     return jsonify({"paused": False})
 
 
-@app.route('/api/cancel', methods=['POST'])
-@login_required
+
 @app.route('/api/cancel', methods=['POST'])
 @login_required
 def cancel_dl():

@@ -13,14 +13,15 @@ import hashlib
 import secrets
 import shutil
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, make_response
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, make_response, send_from_directory
 
 CONFIG_FILE = '/config/looter_config.json'
 CACHE_FILE = '/config/local_cache.json'
 AUTH_FILE = '/config/auth.json'
 
-app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+VERSION = "2.3.0"
+
+app = Flask(__name__, static_folder='static')
 
 # Thread-safe state management
 task_queue = queue.Queue()
@@ -46,7 +47,288 @@ active_workers = 0
 target_workers = 2
 worker_shutdown = threading.Event()
 
+# --- Translations ---
+TRANSLATIONS = {
+    'en': {
+        'app_name': 'JellyLooter',
+        'sign_in': 'Sign In',
+        'sign_out': 'Sign Out',
+        'username': 'Username',
+        'password': 'Password',
+        'remember_me': 'Remember me',
+        'settings': 'Settings',
+        'browse': 'Browse',
+        'downloads': 'Downloads',
+        'help': 'Help',
+        'changelog': 'Changelog',
+        'remote_servers': 'Remote Servers',
+        'local_server': 'Local Server',
+        'add_server': 'Add Server',
+        'remove': 'Remove',
+        'save': 'Save',
+        'cancel': 'Cancel',
+        'download': 'Download',
+        'pause': 'Pause',
+        'resume': 'Resume',
+        'cancel_all': 'Cancel All',
+        'speed_limit': 'Speed Limit',
+        'max_downloads': 'Max Downloads',
+        'no_servers': 'No servers configured',
+        'select_server': 'Select Server',
+        'select_destination': 'Select Destination',
+        'items_selected': 'items selected',
+        'download_complete': 'Download complete',
+        'download_failed': 'Download failed',
+        'connection_error': 'Connection error',
+        'invalid_credentials': 'Invalid credentials',
+        'sync': 'Sync',
+        'rebuild_cache': 'Rebuild Cache',
+        'cache_info': 'Cache Info',
+        'last_scan': 'Last Scan',
+        'items_cached': 'Items Cached',
+        'general': 'General',
+        'advanced': 'Advanced',
+        'authentication': 'Authentication',
+        'enable_auth': 'Enable Authentication',
+        'auth_description': 'Require login to access JellyLooter',
+        'language': 'Language',
+        'items_per_page': 'Items Per Page',
+        'view_mode': 'View Mode',
+        'grid_view': 'Grid',
+        'list_view': 'List',
+        'download_order': 'Download Order',
+        'order_library': 'Library Order',
+        'order_show_complete': 'Complete Shows First',
+        'order_season_round': 'Season Round Robin',
+        'order_episode_round': 'Episode Round Robin',
+        'order_alphabetical': 'Alphabetical',
+        'order_random': 'Random',
+        'confirmed_working': 'Confirmed working on Unraid 7.2.0',
+        'support_project': 'Support the Project',
+        'buy_coffee': 'Buy Me a Coffee',
+        'loading': 'Loading...',
+        'error': 'Error',
+        'success': 'Success',
+        'warning': 'Warning',
+        'free_space': 'Free Space',
+        'total_space': 'Total Space',
+        'refresh': 'Refresh',
+        'back': 'Back',
+        'home': 'Home',
+        'page': 'Page',
+        'of': 'of',
+        'previous': 'Previous',
+        'next': 'Next',
+        'search': 'Search',
+        'filter': 'Filter',
+        'all': 'All',
+        'movies': 'Movies',
+        'shows': 'Shows',
+        'exists_locally': 'Exists Locally',
+        'queued': 'Queued',
+        'downloading': 'Downloading',
+        'completed': 'Completed',
+        'failed': 'Failed',
+        'paused': 'Paused',
+        'starting': 'Starting',
+    },
+    'es': {
+        'app_name': 'JellyLooter',
+        'sign_in': 'Iniciar Sesión',
+        'sign_out': 'Cerrar Sesión',
+        'username': 'Usuario',
+        'password': 'Contraseña',
+        'remember_me': 'Recordarme',
+        'settings': 'Configuración',
+        'browse': 'Explorar',
+        'downloads': 'Descargas',
+        'help': 'Ayuda',
+        'changelog': 'Cambios',
+        'remote_servers': 'Servidores Remotos',
+        'local_server': 'Servidor Local',
+        'add_server': 'Agregar Servidor',
+        'remove': 'Eliminar',
+        'save': 'Guardar',
+        'cancel': 'Cancelar',
+        'download': 'Descargar',
+        'pause': 'Pausar',
+        'resume': 'Reanudar',
+        'cancel_all': 'Cancelar Todo',
+        'speed_limit': 'Límite de Velocidad',
+        'max_downloads': 'Descargas Máximas',
+        'no_servers': 'No hay servidores configurados',
+        'select_server': 'Seleccionar Servidor',
+        'select_destination': 'Seleccionar Destino',
+        'items_selected': 'elementos seleccionados',
+        'download_complete': 'Descarga completa',
+        'download_failed': 'Descarga fallida',
+        'connection_error': 'Error de conexión',
+        'invalid_credentials': 'Credenciales inválidas',
+        'sync': 'Sincronizar',
+        'rebuild_cache': 'Reconstruir Caché',
+        'cache_info': 'Info de Caché',
+        'last_scan': 'Último Escaneo',
+        'items_cached': 'Elementos en Caché',
+        'general': 'General',
+        'advanced': 'Avanzado',
+        'authentication': 'Autenticación',
+        'enable_auth': 'Habilitar Autenticación',
+        'auth_description': 'Requerir inicio de sesión para acceder',
+        'language': 'Idioma',
+        'items_per_page': 'Elementos por Página',
+        'view_mode': 'Modo de Vista',
+        'grid_view': 'Cuadrícula',
+        'list_view': 'Lista',
+        'download_order': 'Orden de Descarga',
+        'order_library': 'Orden de Biblioteca',
+        'order_show_complete': 'Series Completas Primero',
+        'order_season_round': 'Rotación por Temporada',
+        'order_episode_round': 'Rotación por Episodio',
+        'order_alphabetical': 'Alfabético',
+        'order_random': 'Aleatorio',
+        'confirmed_working': 'Confirmado funcionando en Unraid 7.2.0',
+        'support_project': 'Apoya el Proyecto',
+        'buy_coffee': 'Invítame un Café',
+        'loading': 'Cargando...',
+        'error': 'Error',
+        'success': 'Éxito',
+        'warning': 'Advertencia',
+        'free_space': 'Espacio Libre',
+        'total_space': 'Espacio Total',
+        'refresh': 'Actualizar',
+        'back': 'Atrás',
+        'home': 'Inicio',
+        'page': 'Página',
+        'of': 'de',
+        'previous': 'Anterior',
+        'next': 'Siguiente',
+        'search': 'Buscar',
+        'filter': 'Filtrar',
+        'all': 'Todo',
+        'movies': 'Películas',
+        'shows': 'Series',
+        'exists_locally': 'Existe Localmente',
+        'queued': 'En Cola',
+        'downloading': 'Descargando',
+        'completed': 'Completado',
+        'failed': 'Fallido',
+        'paused': 'Pausado',
+        'starting': 'Iniciando',
+    },
+    'de': {
+        'app_name': 'JellyLooter',
+        'sign_in': 'Anmelden',
+        'sign_out': 'Abmelden',
+        'username': 'Benutzername',
+        'password': 'Passwort',
+        'remember_me': 'Angemeldet bleiben',
+        'settings': 'Einstellungen',
+        'browse': 'Durchsuchen',
+        'downloads': 'Downloads',
+        'help': 'Hilfe',
+        'changelog': 'Änderungen',
+        'remote_servers': 'Remote-Server',
+        'local_server': 'Lokaler Server',
+        'add_server': 'Server hinzufügen',
+        'remove': 'Entfernen',
+        'save': 'Speichern',
+        'cancel': 'Abbrechen',
+        'download': 'Herunterladen',
+        'pause': 'Pause',
+        'resume': 'Fortsetzen',
+        'cancel_all': 'Alle abbrechen',
+        'speed_limit': 'Geschwindigkeitslimit',
+        'max_downloads': 'Max. Downloads',
+        'no_servers': 'Keine Server konfiguriert',
+        'select_server': 'Server auswählen',
+        'select_destination': 'Ziel auswählen',
+        'items_selected': 'Elemente ausgewählt',
+        'download_complete': 'Download abgeschlossen',
+        'download_failed': 'Download fehlgeschlagen',
+        'connection_error': 'Verbindungsfehler',
+        'invalid_credentials': 'Ungültige Anmeldedaten',
+        'sync': 'Synchronisieren',
+        'rebuild_cache': 'Cache neu aufbauen',
+        'cache_info': 'Cache-Info',
+        'last_scan': 'Letzter Scan',
+        'items_cached': 'Zwischengespeicherte Elemente',
+        'general': 'Allgemein',
+        'advanced': 'Erweitert',
+        'authentication': 'Authentifizierung',
+        'enable_auth': 'Authentifizierung aktivieren',
+        'auth_description': 'Anmeldung für Zugriff erforderlich',
+        'language': 'Sprache',
+        'items_per_page': 'Elemente pro Seite',
+        'view_mode': 'Ansichtsmodus',
+        'grid_view': 'Raster',
+        'list_view': 'Liste',
+        'download_order': 'Download-Reihenfolge',
+        'order_library': 'Bibliotheksreihenfolge',
+        'order_show_complete': 'Komplette Serien zuerst',
+        'order_season_round': 'Staffel-Rotation',
+        'order_episode_round': 'Episoden-Rotation',
+        'order_alphabetical': 'Alphabetisch',
+        'order_random': 'Zufällig',
+        'confirmed_working': 'Bestätigt funktionierend auf Unraid 7.2.0',
+        'support_project': 'Projekt unterstützen',
+        'buy_coffee': 'Kauf mir einen Kaffee',
+        'loading': 'Laden...',
+        'error': 'Fehler',
+        'success': 'Erfolg',
+        'warning': 'Warnung',
+        'free_space': 'Freier Speicher',
+        'total_space': 'Gesamtspeicher',
+        'refresh': 'Aktualisieren',
+        'back': 'Zurück',
+        'home': 'Start',
+        'page': 'Seite',
+        'of': 'von',
+        'previous': 'Zurück',
+        'next': 'Weiter',
+        'search': 'Suchen',
+        'filter': 'Filter',
+        'all': 'Alle',
+        'movies': 'Filme',
+        'shows': 'Serien',
+        'exists_locally': 'Lokal vorhanden',
+        'queued': 'In Warteschlange',
+        'downloading': 'Wird heruntergeladen',
+        'completed': 'Abgeschlossen',
+        'failed': 'Fehlgeschlagen',
+        'paused': 'Pausiert',
+        'starting': 'Startet',
+    }
+}
+
+
+def get_translation(key, lang='en'):
+    """Get translation for a key"""
+    return TRANSLATIONS.get(lang, TRANSLATIONS['en']).get(key, TRANSLATIONS['en'].get(key, key))
+
+
+def get_all_translations(lang='en'):
+    """Get all translations for a language"""
+    return TRANSLATIONS.get(lang, TRANSLATIONS['en'])
+
+
 # --- Authentication Helpers ---
+
+def init_secret_key():
+    """Initialize or load secret key for Flask sessions"""
+    auth = load_auth()
+    if auth and 'secret_key' in auth:
+        return auth['secret_key']
+    
+    # Generate new secret key
+    secret = secrets.token_hex(32)
+    
+    # Save it if auth is enabled
+    if auth:
+        auth['secret_key'] = secret
+        save_auth(auth)
+    
+    return secret
+
 
 def hash_password(password, salt=None):
     """Hash password with salt using SHA-256"""
@@ -83,16 +365,28 @@ def save_auth(auth_data):
         json.dump(auth_data, f, indent=4)
 
 
+def is_auth_enabled():
+    """Check if authentication is enabled"""
+    cfg = load_config()
+    return cfg.get('auth_enabled', False)
+
+
 def is_setup_complete():
-    """Check if initial setup has been completed"""
+    """Check if initial setup has been completed (only matters if auth is enabled)"""
+    if not is_auth_enabled():
+        return True
     auth = load_auth()
     return auth is not None and 'users' in auth and len(auth['users']) > 0
 
 
 def login_required(f):
-    """Decorator to require authentication"""
+    """Decorator to require authentication (only if auth is enabled)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # If auth is disabled, allow access
+        if not is_auth_enabled():
+            return f(*args, **kwargs)
+        
         if 'user' not in session:
             remember_token = request.cookies.get('remember_token')
             if remember_token:
@@ -144,7 +438,7 @@ def format_bytes(size):
 def get_auth_header(token=None):
     """Generate Jellyfin/Emby auth header"""
     return {
-        'X-Emby-Authorization': f'MediaBrowser Client="JellyLooter", Device="Unraid", DeviceId="JellyLooterId", Version="2.2.0", Token="{token or ""}"'
+        'X-Emby-Authorization': f'MediaBrowser Client="JellyLooter", Device="Unraid", DeviceId="JellyLooterId", Version="{VERSION}", Token="{token or ""}"'
     }
 
 
@@ -186,7 +480,12 @@ def get_default_config():
         "auto_start_downloads": True,
         "log_retention_days": 7,
         "connection_timeout": 30,
-        "chunk_size_kb": 64
+        "chunk_size_kb": 64,
+        "auth_enabled": False,
+        "language": "en",
+        "items_per_page": 50,
+        "view_mode": "grid",
+        "download_order": "library"
     }
 
 
@@ -209,6 +508,18 @@ def save_config(data):
         json.dump(data, f, indent=4)
     setup_schedule()
     adjust_workers(data.get('max_concurrent_downloads', 2))
+    
+    # Handle auth state changes
+    if data.get('auth_enabled', False):
+        auth = load_auth()
+        if not auth:
+            # Initialize auth file with secret key
+            auth = {'secret_key': secrets.token_hex(32), 'users': {}, 'tokens': {}}
+            save_auth(auth)
+        elif 'secret_key' not in auth:
+            auth['secret_key'] = secrets.token_hex(32)
+            save_auth(auth)
+        app.secret_key = auth['secret_key']
 
 
 # --- Cache Management ---
@@ -580,6 +891,97 @@ def _cleanup_download(tid, filepath):
             pass
 
 
+# --- Download Queue Ordering ---
+
+def sort_download_queue(items, order='library'):
+    """Sort items based on download order preference"""
+    if order == 'random':
+        random.shuffle(items)
+        return items
+    
+    if order == 'alphabetical':
+        return sorted(items, key=lambda x: x.get('sort_name', x.get('Name', '')).lower())
+    
+    if order == 'show_complete':
+        # Group by series, download complete series before moving to next
+        series_groups = {}
+        movies = []
+        for item in items:
+            series_name = item.get('SeriesName')
+            if series_name:
+                if series_name not in series_groups:
+                    series_groups[series_name] = []
+                series_groups[series_name].append(item)
+            else:
+                movies.append(item)
+        
+        result = movies
+        for series in sorted(series_groups.keys()):
+            eps = series_groups[series]
+            eps.sort(key=lambda x: (x.get('ParentIndexNumber', 0), x.get('IndexNumber', 0)))
+            result.extend(eps)
+        return result
+    
+    if order == 'season_round':
+        # First season of each show, then second season of each, etc.
+        series_seasons = {}
+        movies = []
+        for item in items:
+            series_name = item.get('SeriesName')
+            if series_name:
+                season = item.get('ParentIndexNumber', 0)
+                key = (series_name, season)
+                if key not in series_seasons:
+                    series_seasons[key] = []
+                series_seasons[key].append(item)
+            else:
+                movies.append(item)
+        
+        # Sort episodes within each season
+        for key in series_seasons:
+            series_seasons[key].sort(key=lambda x: x.get('IndexNumber', 0))
+        
+        # Get max season number
+        max_season = max([k[1] for k in series_seasons.keys()], default=0)
+        
+        result = movies
+        for season_num in range(1, max_season + 2):
+            for series_name in sorted(set(k[0] for k in series_seasons.keys())):
+                key = (series_name, season_num)
+                if key in series_seasons:
+                    result.extend(series_seasons[key])
+        return result
+    
+    if order == 'episode_round':
+        # First episode of each show, then second episode of each, etc.
+        series_episodes = {}
+        movies = []
+        for item in items:
+            series_name = item.get('SeriesName')
+            if series_name:
+                if series_name not in series_episodes:
+                    series_episodes[series_name] = []
+                series_episodes[series_name].append(item)
+            else:
+                movies.append(item)
+        
+        # Sort by season then episode
+        for series in series_episodes:
+            series_episodes[series].sort(key=lambda x: (x.get('ParentIndexNumber', 0), x.get('IndexNumber', 0)))
+        
+        # Round robin through episodes
+        result = movies
+        max_len = max([len(eps) for eps in series_episodes.values()], default=0)
+        for i in range(max_len):
+            for series in sorted(series_episodes.keys()):
+                if i < len(series_episodes[series]):
+                    result.append(series_episodes[series][i])
+        return result
+    
+    # Default: library order (as returned by server)
+    return items
+
+
 # --- API Authentication ---
 
 def login_with_creds(url, username, password):
@@ -592,10 +994,27 @@ def login_with_creds(url, username, password):
             timeout=10
         )
         if response.status_code == 200:
-            return response.json().get("AccessToken")
+            data = response.json()
+            return data.get("AccessToken")
+        else:
+            log(f"Auth failed: {response.status_code} - {response.text[:200]}")
+            return None
+    except requests.exceptions.Timeout:
+        log("Auth failed: Connection timeout")
         return None
-    except Exception:
+    except requests.exceptions.ConnectionError as e:
+        log(f"Auth failed: Connection error - {e}")
         return None
+    except Exception as e:
+        log(f"Auth failed: {e}")
+        return None
+
+
+# --- Flask Routes: Static Files ---
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(app.static_folder, filename)
 
 
 # --- Flask Routes: Authentication ---
@@ -603,6 +1022,8 @@ def login_with_creds(url, username, password):
 @app.route('/setup')
 def setup_page():
     """Initial setup page"""
+    if not is_auth_enabled():
+        return redirect(url_for('index'))
     if is_setup_complete():
         return redirect(url_for('login'))
     return render_template('setup.html')
@@ -611,18 +1032,21 @@ def setup_page():
 @app.route('/login')
 def login():
     """Login page"""
+    if not is_auth_enabled():
+        return redirect(url_for('index'))
     if not is_setup_complete():
         return redirect(url_for('setup_page'))
     if 'user' in session:
         return redirect(url_for('index'))
-    return render_template('login.html')
+    cfg = load_config()
+    return render_template('login.html', lang=cfg.get('language', 'en'), version=VERSION)
 
 
 @app.route('/logout')
 def logout():
     """Logout and clear session"""
     session.pop('user', None)
-    response = make_response(redirect(url_for('login')))
+    response = make_response(redirect(url_for('login') if is_auth_enabled() else url_for('index')))
     response.delete_cookie('remember_token')
     return response
 
@@ -630,6 +1054,8 @@ def logout():
 @app.route('/api/setup', methods=['POST'])
 def api_setup():
     """Handle initial setup"""
+    if not is_auth_enabled():
+        return jsonify({"status": "error", "message": "Authentication is disabled"})
     if is_setup_complete():
         return jsonify({"status": "error", "message": "Setup already completed"})
     
@@ -643,13 +1069,13 @@ def api_setup():
     if len(password) < 4:
         return jsonify({"status": "error", "message": "Password must be at least 4 characters"})
     
-    auth_data = {
-        'users': {
-            username: hash_password(password)
-        },
-        'tokens': {}
-    }
-    save_auth(auth_data)
+    auth = load_auth() or {}
+    auth['users'] = {username: hash_password(password)}
+    auth['tokens'] = {}
+    if 'secret_key' not in auth:
+        auth['secret_key'] = secrets.token_hex(32)
+    save_auth(auth)
+    app.secret_key = auth['secret_key']
     
     return jsonify({"status": "ok", "message": "Setup complete"})
 
@@ -657,6 +1083,9 @@ def api_setup():
 @app.route('/api/login', methods=['POST'])
 def api_login():
     """Handle login"""
+    if not is_auth_enabled():
+        return jsonify({"status": "error", "message": "Authentication is disabled"})
+    
     data = request.json
     username = data.get('username', '').strip()
     password = data.get('password', '')
@@ -692,19 +1121,31 @@ def api_login():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    cfg = load_config()
+    lang = cfg.get('language', 'en')
+    return render_template('index.html', 
+                           lang=lang, 
+                           translations=get_all_translations(lang),
+                           version=VERSION,
+                           config=cfg)
 
 
 @app.route('/changelog')
 @login_required
 def changelog():
-    return render_template('changelog.html')
+    cfg = load_config()
+    return render_template('changelog.html', 
+                           lang=cfg.get('language', 'en'),
+                           version=VERSION)
 
 
 @app.route('/help')
 @login_required
 def help_page():
-    return render_template('help.html')
+    cfg = load_config()
+    return render_template('help.html', 
+                           lang=cfg.get('language', 'en'),
+                           version=VERSION)
 
 
 @app.route('/api/config', methods=['GET', 'POST'])
@@ -714,6 +1155,14 @@ def config_api():
         save_config(request.json)
         return jsonify({"status": "ok"})
     return jsonify(load_config())
+
+
+@app.route('/api/translations')
+def get_translations():
+    """Get translations for current language"""
+    cfg = load_config()
+    lang = request.args.get('lang', cfg.get('language', 'en'))
+    return jsonify(get_all_translations(lang))
 
 
 @app.route('/api/status')
@@ -728,7 +1177,8 @@ def status():
             "cache_count": len(local_id_cache),
             "scan_progress": dict(scan_progress),
             "queue_size": task_queue.qsize(),
-            "worker_count": active_workers
+            "worker_count": active_workers,
+            "version": VERSION
         })
 
 
@@ -797,25 +1247,53 @@ def cancel_dl():
 @login_required
 def test_connection():
     data = request.json
+    url = data.get('url', '').rstrip('/')
+    
+    if not url:
+        return jsonify({"status": "error", "error": "URL is required"})
+    
     try:
         if data.get('username'):
+            # Username/password auth
             token = login_with_creds(
-                data['url'],
+                url,
                 data.get('username'),
                 data.get('password')
             )
             if token:
-                return jsonify({"status": "ok", "key": token})
+                # Verify the token works
+                verify_response = requests.get(
+                    f"{url}/Users",
+                    headers=get_auth_header(token),
+                    timeout=10
+                )
+                if verify_response.ok and verify_response.json():
+                    return jsonify({"status": "ok", "key": token})
+                else:
+                    return jsonify({"status": "error", "error": "Token verification failed"})
             return jsonify({"status": "error", "error": "Invalid credentials"})
         else:
+            # API key auth
+            key = data.get('key')
+            if not key:
+                return jsonify({"status": "error", "error": "API key is required"})
+            
             response = requests.get(
-                f"{data['url']}/Users",
-                headers=get_auth_header(data.get('key')),
-                timeout=5
+                f"{url}/Users",
+                headers=get_auth_header(key),
+                timeout=10
             )
             if response.ok:
-                return jsonify({"status": "ok", "key": data.get('key')})
-            return jsonify({"status": "error", "error": "Invalid API Key"})
+                users = response.json()
+                if users and len(users) > 0:
+                    return jsonify({"status": "ok", "key": key})
+                else:
+                    return jsonify({"status": "error", "error": "No users found - invalid API key?"})
+            return jsonify({"status": "error", "error": f"Server returned {response.status_code}"})
+    except requests.exceptions.Timeout:
+        return jsonify({"status": "error", "error": "Connection timeout"})
+    except requests.exceptions.ConnectionError:
+        return jsonify({"status": "error", "error": "Cannot connect to server"})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)})
 
@@ -878,14 +1356,26 @@ def browse_remote():
         None
     )
     if not server:
-        return jsonify({"items": [], "total": 0})
+        return jsonify({"items": [], "total": 0, "error": "Server not found"})
     
     try:
         headers = get_auth_header(server['key'])
-        user_id = requests.get(
+        users_response = requests.get(
             f"{server['url']}/Users",
-            headers=headers
-        ).json()[0]['Id']
+            headers=headers,
+            timeout=10
+        )
+        
+        if not users_response.ok:
+            log(f"Browse Error: Server returned {users_response.status_code}")
+            return jsonify({"items": [], "total": 0, "error": f"Auth failed: {users_response.status_code}"})
+        
+        users_data = users_response.json()
+        if not users_data or len(users_data) == 0:
+            log("Browse Error: No users returned from server")
+            return jsonify({"items": [], "total": 0, "error": "No users found - check API key"})
+        
+        user_id = users_data[0]['Id']
         
         local_ids = get_existing_ids()
         
@@ -908,12 +1398,17 @@ def browse_remote():
                 "total": len(items)
             })
         else:
+            # Get pagination params
+            page = data.get('page', 1)
+            items_per_page = data.get('items_per_page', cfg.get('items_per_page', 50))
+            skip = (page - 1) * items_per_page
+            
             params = {
                 'ParentId': data['parent_id'],
                 'SortBy': 'SortName',
                 'Fields': 'ImageTags,ProviderIds',
-                'StartIndex': data.get('skip', 0),
-                'Limit': data.get('limit', 50)
+                'StartIndex': skip,
+                'Limit': items_per_page
             }
             
             response = requests.get(
@@ -942,13 +1437,22 @@ def browse_remote():
                     "IsFolder": is_folder,
                     "HasImage": 'Primary' in item.get('ImageTags', {}),
                     "ExistsLocally": exists,
-                    "Type": item.get('Type', 'Unknown')
+                    "Type": item.get('Type', 'Unknown'),
+                    "SeriesName": item.get('SeriesName'),
+                    "ParentIndexNumber": item.get('ParentIndexNumber'),
+                    "IndexNumber": item.get('IndexNumber')
                 })
+            
+            total = response.get('TotalRecordCount', 0)
+            total_pages = (total + items_per_page - 1) // items_per_page
             
             return jsonify({
                 "items": clean_items,
                 "base_url": server['url'],
-                "total": response.get('TotalRecordCount', 0)
+                "total": total,
+                "page": page,
+                "items_per_page": items_per_page,
+                "total_pages": total_pages
             })
             
     except Exception as e:
@@ -974,6 +1478,8 @@ def batch_download():
     if not space_ok:
         return jsonify({"status": "error", "message": space_msg})
     
+    download_order = cfg.get('download_order', 'library')
+    
     for item_id in data['item_ids']:
         tid = generate_id()
         with download_lock:
@@ -981,7 +1487,7 @@ def batch_download():
         
         threading.Thread(
             target=recursive_resolve,
-            args=(server, item_id, data['path'], tid, cfg.get('speed_limit_kbs', 0)),
+            args=(server, item_id, data['path'], tid, cfg.get('speed_limit_kbs', 0), download_order),
             daemon=True
         ).start()
     
@@ -1011,7 +1517,7 @@ def get_disk_space():
         })
 
 
-def recursive_resolve(server, item_id, base_path, tid, limit):
+def recursive_resolve(server, item_id, base_path, tid, limit, download_order='library'):
     """Resolve item and queue downloads (handles series/seasons)"""
     global pending_display
     
@@ -1036,12 +1542,16 @@ def recursive_resolve(server, item_id, base_path, tid, limit):
                 params={
                     'ParentId': item_id,
                     'Recursive': 'true',
-                    'IncludeItemTypes': 'Movie,Episode'
+                    'IncludeItemTypes': 'Movie,Episode',
+                    'Fields': 'ProviderIds'
                 }
             ).json().get('Items', [])
             
             with download_lock:
                 pending_display = [x for x in pending_display if x['id'] != tid]
+            
+            # Sort children based on download order
+            children = sort_download_queue(children, download_order)
             
             for child in children:
                 sub_tid = generate_id()
@@ -1165,6 +1675,8 @@ def sync_job():
     log("─── Sync Started ───")
     load_cache_from_disk()
     
+    download_order = cfg.get('download_order', 'library')
+    
     for mapping in cfg['mappings']:
         server = next(
             (s for s in cfg['servers'] if s['id'] == mapping['server_id']),
@@ -1191,7 +1703,8 @@ def sync_job():
                 }
             ).json().get('Items', [])
             
-            queued = 0
+            # Filter out items we already have
+            items_to_queue = []
             for item in items:
                 if local_id_cache:
                     providers = item.get('ProviderIds', {})
@@ -1199,7 +1712,13 @@ def sync_job():
                     tmdb_key = f"tmdb_{providers.get('Tmdb')}"
                     if imdb_key in local_id_cache or tmdb_key in local_id_cache:
                         continue
-                
+                items_to_queue.append(item)
+            
+            # Sort based on download order
+            items_to_queue = sort_download_queue(items_to_queue, download_order)
+            
+            queued = 0
+            for item in items_to_queue:
                 tid = generate_id()
                 queue_item(server, item, mapping['local_path'], tid, cfg.get('speed_limit_kbs', 0))
                 queued += 1
@@ -1214,7 +1733,29 @@ def sync_job():
 
 # --- Application Startup ---
 
+def init_app():
+    """Initialize application"""
+    global app
+    
+    # Load or generate secret key
+    cfg = load_config()
+    if cfg.get('auth_enabled', False):
+        auth = load_auth()
+        if auth and 'secret_key' in auth:
+            app.secret_key = auth['secret_key']
+        else:
+            secret = secrets.token_hex(32)
+            if auth:
+                auth['secret_key'] = secret
+                save_auth(auth)
+            app.secret_key = secret
+    else:
+        # Auth disabled - use a session secret anyway for flash messages etc
+        app.secret_key = secrets.token_hex(32)
+
+
 if __name__ == '__main__':
+    init_app()
     load_cache_from_disk()
     
     cfg = load_config()
@@ -1224,6 +1765,7 @@ if __name__ == '__main__':
     setup_schedule()
     threading.Thread(target=schedule_runner, daemon=True).start()
     
-    log("JellyLooter v2.2.0 started")
+    log(f"JellyLooter v{VERSION} started")
     log(f"Workers: {active_workers}, Speed limit: {cfg.get('speed_limit_kbs', 0)} KB/s")
+    log(f"Auth: {'Enabled' if cfg.get('auth_enabled', False) else 'Disabled'}")
     app.run(host='0.0.0.0', port=5000, threaded=True)

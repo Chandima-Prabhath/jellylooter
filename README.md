@@ -1,12 +1,12 @@
-# 🍇 JellyLooter
-
-Sync media content from remote Jellyfin/Emby servers to your local storage.
+# 🍇 JellyLooter v2.3.0
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/friendlymedia)
 
----
+Sync media content from remote Jellyfin/Emby servers to your local storage.
 
-## Features
+![JellyLooter Screenshot](https://raw.githubusercontent.com/jlightner86/jellylooter/main/icon.png)
+
+## ✨ Features
 
 - 📁 **Browse Remote Libraries** - Navigate and preview content from multiple Jellyfin/Emby servers
 - 🔄 **Automatic Sync** - Schedule automatic downloads based on library mappings
@@ -14,12 +14,23 @@ Sync media content from remote Jellyfin/Emby servers to your local storage.
 - ⏸️ **Download Control** - Pause, resume, and cancel downloads
 - 🚀 **Speed Limiting** - Optional bandwidth throttling (updates in real-time)
 - 👥 **Dynamic Workers** - Adjust concurrent downloads without restart
-- 🔐 **Authentication** - Secure login with remember me option
-- 🎨 **Clean UI** - Jellyfin-inspired dark theme
+- 🔐 **Optional Authentication** - Secure login (disabled by default)
+- 📱 **Mobile Friendly** - Responsive design works on phones and tablets
+- 🌍 **Multi-Language** - English, Spanish, German
+- 🎨 **Clean UI** - Jellyfin-inspired dark theme with Grid/List view toggle
 
----
+## 🆕 What's New in v2.3.0
 
-## Installation
+- **Authentication is now optional** - No more secret key errors! Auth is disabled by default.
+- **Mobile-friendly design** - Works great on phones and tablets
+- **Grid/List view toggle** - Choose how you browse your library
+- **Pagination** - Configurable items per page (25/50/100)
+- **Download queue ordering** - Library order, complete shows first, round-robin, alphabetical, or random
+- **Multi-language support** - English, Spanish, German
+- **Fixed tooltip z-index** - Refresh button tooltip no longer hidden
+- **Confirmed working on Unraid 7.2.0**
+
+## 🐳 Docker Installation
 
 ### Docker Compose (Recommended)
 
@@ -43,7 +54,6 @@ services:
 
 ```bash
 docker build -t jellylooter .
-
 docker run -d \
   --name jellylooter \
   --restart unless-stopped \
@@ -56,7 +66,7 @@ docker run -d \
 
 ### Unraid
 
-1. Go to **Docker** → **Add Container**
+1. Go to **Docker → Add Container**
 2. Configure:
    - **Repository:** `jellylooter`
    - **Port:** `5000` → `5000`
@@ -64,125 +74,63 @@ docker run -d \
    - **Path:** `/storage` → `/mnt/user` (or your media location)
 3. Click **Apply**
 
----
-
-## Quick Start
+## 🚀 Quick Start
 
 1. Access the web UI at `http://YOUR_IP:5000`
-2. Create your admin account on first run
-3. Add a remote Jellyfin/Emby server in Settings
-4. Browse and download!
+2. Add a remote Jellyfin/Emby server in Settings
+3. Browse and download!
 
----
-
-## Configuration
+## ⚙️ Configuration
 
 ### Adding a Remote Server
-
 1. Go to **Settings** tab
-2. Click **+ Add Remote Server**
+2. Click **Add Server**
 3. Enter server URL and API key (or username/password)
 4. Test connection and save
 
 ### Duplicate Detection
-
 1. Configure your local Jellyfin/Emby server in Settings
 2. Click **Rebuild Cache** to scan your library
 3. Items you already have will be marked with ✓
 
-### Speed Limiting
+### Download Order Options
+- **Library Order** - Match remote server order
+- **Complete Shows First** - Download all episodes of one show before moving to next
+- **Season Round Robin** - First season of each show, then second seasons, etc.
+- **Episode Round Robin** - First episode of each show, then second episodes, etc.
+- **Alphabetical** - Sort by title
+- **Random** - Shuffle order
 
-- Set in **Settings** → **Advanced** → **Speed Limit**
+### Speed Limiting
+- Set in **Settings → Downloads → Speed Limit**
 - Value is in KB/s (0 = unlimited)
 - Changes apply to active downloads within 10 seconds
 
-### Concurrent Downloads
-
-- Set in **Settings** → **Advanced** → **Max Downloads**
-- Workers adjust dynamically - no restart needed!
-
----
-
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### "No space left on device" Error
+Check your Docker volume mapping:
+```bash
+docker inspect jellylooter | grep -A10 "Mounts"
+docker exec jellylooter df -h /storage
+docker exec jellylooter touch /storage/test && docker exec jellylooter rm /storage/test
+```
 
-This usually means Docker can't write to your storage path. Check:
+### View Logs
+```bash
+docker logs -f jellylooter
+```
 
-1. **Volume mapping is correct:**
-   ```bash
-   docker inspect jellylooter | grep -A5 "Mounts"
-   ```
+## ☕ Support the Project
 
-2. **Path exists and is writable:**
-   ```bash
-   docker exec jellylooter ls -la /storage
-   docker exec jellylooter touch /storage/test && rm /storage/test
-   ```
-
-3. **Actual disk space:**
-   ```bash
-   df -h /mnt/user
-   ```
-
-### Downloads are slow
-
-- Check **Speed Limit** in Settings (0 = unlimited)
-- Verify network to remote server
-- Try increasing **Chunk Size** in Advanced settings
-
-### Can't connect to remote server
-
-- Verify URL includes port (e.g., `http://192.168.1.100:8096`)
-- Check API key is valid
-- Ensure server is accessible from Docker network
-
----
-
-## Support the Project
-
-If JellyLooter is useful to you, consider buying me a coffee! ☕
+If JellyLooter is useful to you, consider buying me a coffee!
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/friendlymedia)
 
-Your support helps keep this project maintained and improved!
-
----
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/config` | GET/POST | Configuration |
-| `/api/status` | GET | Download status |
-| `/api/logs` | GET | Activity log |
-| `/api/pause` | POST | Pause downloads |
-| `/api/resume` | POST | Resume downloads |
-| `/api/cancel` | POST | Cancel download(s) |
-| `/api/sync` | POST | Trigger sync |
-| `/api/rebuild_cache` | POST | Rescan local library |
-| `/api/disk_space` | POST | Check disk space |
-
----
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) or the `/changelog` page in the app.
-
----
-
-## License
+## 📜 License
 
 MIT License
 
 ---
 
-## Contributing
-
-Pull requests welcome! Please open an issue first for major changes.
-
----
-
-<p align="center">
-  Made with ❤️ by <a href="https://buymeacoffee.com/friendlymedia">FriendlyMedia</a>
-</p>
+JellyLooter v2.3.0 • Made with ❤️ by [FriendlyMedia](https://buymeacoffee.com/friendlymedia)

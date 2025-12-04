@@ -542,6 +542,55 @@
             padding: 0.25rem;
         }
 
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 0;
+            border-top: 1px solid var(--jf-border);
+            margin-top: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .pagination-info {
+            display: flex;
+            align-items: center;
+            color: var(--jf-text-muted);
+            font-size: 0.875rem;
+        }
+
+        .pagination-buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .pagination-buttons .btn {
+            min-width: 36px;
+        }
+
+        .page-number {
+            padding: 0.375rem 0.75rem;
+            background: var(--jf-bg-input);
+            border: 1px solid var(--jf-border);
+            border-radius: var(--radius);
+            color: var(--jf-text);
+            cursor: pointer;
+            font-size: 0.875rem;
+            margin: 0 0.125rem;
+        }
+
+        .page-number:hover {
+            background: var(--jf-bg-card-hover);
+        }
+
+        .page-number.active {
+            background: var(--jf-primary);
+            border-color: var(--jf-primary);
+            color: white;
+        }
+
         .browser-item {
             position: relative;
             aspect-ratio: 2/3;
@@ -1125,6 +1174,26 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Pagination Controls -->
+                        <div class="pagination-controls" id="pagination-controls" style="display: none;">
+                            <div class="pagination-info">
+                                <span id="pagination-info-text">Page 1 of 1</span>
+                                <select id="items-per-page" class="form-input" style="width: auto; padding: 0.375rem 0.5rem; margin-left: 1rem;">
+                                    <option value="25">25 per page</option>
+                                    <option value="50" selected>50 per page</option>
+                                    <option value="100">100 per page</option>
+                                    <option value="200">200 per page</option>
+                                </select>
+                            </div>
+                            <div class="pagination-buttons">
+                                <button class="btn btn-sm" id="page-first" disabled>«</button>
+                                <button class="btn btn-sm" id="page-prev" disabled>‹</button>
+                                <span id="page-numbers"></span>
+                                <button class="btn btn-sm" id="page-next" disabled>›</button>
+                                <button class="btn btn-sm" id="page-last" disabled>»</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1492,6 +1561,12 @@
         let selectedItems = new Set();
         let pendingDownloadPath = '/storage';
         let baseUrl = '';
+        
+        // Pagination state
+        let currentPage = 1;
+        let totalPages = 1;
+        let itemsPerPage = 50;
+        let totalItems = 0;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -1800,6 +1875,7 @@
                 currentServerId = e.target.value;
                 if (currentServerId) {
                     currentParentId = 'root';
+                    currentPage = 1;
                     browserPath = [{ id: 'root', name: '🏠 Home' }];
                     browseRemote();
                 }
@@ -1807,6 +1883,9 @@
 
             // Refresh button
             document.getElementById('refresh-btn').addEventListener('click', browseRemote);
+            
+            // Pagination controls
+            setupPaginationListeners();
 
             // Download controls
             document.getElementById('pause-btn').addEventListener('click', () => api('pause', 'POST'));
@@ -1871,12 +1950,78 @@
 
             const data = await api('browse_remote', 'POST', {
                 server_id: currentServerId,
-                parent_id: currentParentId
+                parent_id: currentParentId,
+                page: currentPage,
+                items_per_page: itemsPerPage
             });
 
             baseUrl = data.base_url;
+            totalItems = data.total || 0;
+            totalPages = data.total_pages || 1;
+            
             renderBrowserItems(data.items);
             renderBrowserPath();
+            renderPagination();
+        }
+        
+        function renderPagination() {
+            const controls = document.getElementById('pagination-controls');
+            const infoText = document.getElementById('pagination-info-text');
+            const pageNumbers = document.getElementById('page-numbers');
+            
+            // Only show pagination if we have more than one page or if not at root
+            if (totalPages <= 1 && currentParentId === 'root') {
+                controls.style.display = 'none';
+                return;
+            }
+            
+            controls.style.display = 'flex';
+            
+            const startItem = (currentPage - 1) * itemsPerPage + 1;
+            const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+            infoText.textContent = totalItems > 0 
+                ? `Showing ${startItem}-${endItem} of ${totalItems} items (Page ${currentPage}/${totalPages})`
+                : `Page ${currentPage} of ${totalPages}`;
+            
+            // Update button states
+            document.getElementById('page-first').disabled = currentPage <= 1;
+            document.getElementById('page-prev').disabled = currentPage <= 1;
+            document.getElementById('page-next').disabled = currentPage >= totalPages;
+            document.getElementById('page-last').disabled = currentPage >= totalPages;
+            
+            // Render page numbers
+            let html = '';
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+            
+            if (endPage - startPage < maxPages - 1) {
+                startPage = Math.max(1, endPage - maxPages + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="page-number ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            }
+            pageNumbers.innerHTML = html;
+        }
+        
+        function goToPage(page) {
+            if (page < 1 || page > totalPages || page === currentPage) return;
+            currentPage = page;
+            browseRemote();
+        }
+        
+        function setupPaginationListeners() {
+            document.getElementById('page-first').onclick = () => goToPage(1);
+            document.getElementById('page-prev').onclick = () => goToPage(currentPage - 1);
+            document.getElementById('page-next').onclick = () => goToPage(currentPage + 1);
+            document.getElementById('page-last').onclick = () => goToPage(totalPages);
+            
+            document.getElementById('items-per-page').onchange = (e) => {
+                itemsPerPage = parseInt(e.target.value);
+                currentPage = 1;
+                browseRemote();
+            };
         }
 
         function renderBrowserItems(items) {
@@ -1965,6 +2110,7 @@
 
         function navigateTo(id, name) {
             currentParentId = id;
+            currentPage = 1;
             browserPath.push({ id, name });
             clearSelection();
             browseRemote();
@@ -1973,6 +2119,7 @@
         function navigateToPath(index) {
             browserPath = browserPath.slice(0, index + 1);
             currentParentId = browserPath[browserPath.length - 1].id;
+            currentPage = 1;
             clearSelection();
             browseRemote();
         }
@@ -2067,8 +2214,13 @@
             const url = document.getElementById('server-url').value;
             const key = document.getElementById('server-key').value;
 
-            if (!name || !url || !key) {
-                showToast('Please fill in all fields', 'error');
+            if (!name || !url) {
+                showToast('Please fill in server name and URL', 'error');
+                return;
+            }
+            
+            if (!key) {
+                showToast('Please test connection first to verify credentials', 'error');
                 return;
             }
 

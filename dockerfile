@@ -12,7 +12,8 @@ VOLUME /storage
 
 # Copy the application AND the templates
 COPY looter_app.py .
-COPY templates ./templates
+COPY templates ./template
 
 # Run the application
 CMD ["python", "-u", "looter_app.py"]
+

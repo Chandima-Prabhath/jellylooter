@@ -778,7 +778,7 @@ def download_file(task):
                 'status': 'Starting'
             }
         
-        with requests.get(task['url'], stream=True, timeout=timeout) as response:
+        with requests.get(task['url'], stream=True, timeout=timeout, headers=task.get('headers', {})) as response:
             response.raise_for_status()
             
             total_size = int(response.headers.get('content-length', 0))
@@ -1608,10 +1608,11 @@ def queue_item(server, item, base_path, tid, limit):
                 pending_display.append({"name": filename, "id": tid})
         
         task_queue.put({
-            'url': f"{server['url']}/Items/{item['Id']}/Download?api_key={server['key']}",
+            'url': f"{server['url']}/Items/{item['Id']}/Download",
             'filepath': filepath,
             'task_id': tid,
-            'limit': limit
+            'limit': limit,
+            'headers': get_auth_header(server['key'])
         })
         
     except Exception as e:

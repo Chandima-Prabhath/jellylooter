@@ -2,17 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application
 COPY looter_app.py .
-COPY templates/ templates/
-COPY static/ static/
 
-RUN mkdir -p /config /storage
+# Copy templates (required)
+COPY templates/ templates/
+
+# Create directories
+RUN mkdir -p /config /storage static
 
 EXPOSE 5000
 

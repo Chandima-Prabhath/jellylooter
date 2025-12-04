@@ -657,6 +657,8 @@
             cursor: pointer;
             transition: var(--transition);
             border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
         }
 
         .browser-item:hover {
@@ -683,17 +685,18 @@
             font-size: 0.75rem;
             font-weight: bold;
             color: white;
+            z-index: 2;
         }
 
         .browser-item-poster {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            object-position: center top;
         }
 
         .browser-item-placeholder {
-            width: 100%;
-            height: 100%;
+            flex: 1;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1571,7 +1574,13 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Local Path</label>
-                    <input type="text" class="form-input" id="mapping-path" placeholder="/storage/media">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="text" class="form-input" id="mapping-path" placeholder="/storage/media" style="flex: 1;">
+                        <button class="btn btn-secondary" onclick="openMappingPathBrowser()">Browse</button>
+                    </div>
+                </div>
+                <div id="mapping-folder-browser" style="display: none; margin-top: 0.5rem; max-height: 200px; overflow-y: auto; border: 1px solid var(--jf-border); border-radius: var(--radius); background: var(--jf-bg-input);">
+                    <div id="mapping-folder-list"></div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -2097,8 +2106,11 @@
 
             grid.innerHTML = items.map(item => {
                 const icon = item.IsFolder ? '📁' : (item.Type === 'Movie' ? '🎬' : '📺');
-                // Use Primary image with proper width for poster aspect ratio
-                const imgSrc = item.HasImage ? `${baseUrl}/Items/${item.Id}/Images/Primary?maxWidth=200&quality=90` : '';
+                
+                // Use the image type returned by the server, defaulting to Primary
+                const imageType = item.ImageType || 'Primary';
+                const imgSrc = item.HasImage ? `${baseUrl}/Items/${item.Id}/Images/${imageType}?fillWidth=200&fillHeight=300&quality=90` : '';
+                
                 const classes = ['browser-item'];
                 if (item.IsFolder) classes.push('folder');
                 if (item.ExistsLocally) classes.push('exists');
@@ -2112,7 +2124,8 @@
                          onclick="handleItemClick(event, '${item.Id}', ${item.IsFolder}, '${escapeHtml(item.Name)}')"
                          oncontextmenu="handleItemContext(event, '${item.Id}')">
                         ${imgSrc ? 
-                            `<img class="browser-item-poster" src="${imgSrc}" loading="lazy" alt="" onerror="this.parentElement.innerHTML='<div class=browser-item-placeholder>${icon}</div><div class=browser-item-title>${escapeHtml(item.Name)}</div>'">` :
+                            `<img class="browser-item-poster" src="${imgSrc}" loading="lazy" alt="" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                             <div class="browser-item-placeholder" style="display:none;">${icon}</div>` :
                             `<div class="browser-item-placeholder">${icon}</div>`
                         }
                         <div class="browser-item-title">${escapeHtml(item.Name)}</div>
@@ -2352,6 +2365,54 @@
             closeModal('mapping-modal');
             loadConfig();
             showToast('Mapping added');
+        }
+
+        // Mapping Path Browser
+        let mappingBrowserPath = '/storage';
+        
+        async function openMappingPathBrowser() {
+            const browser = document.getElementById('mapping-folder-browser');
+            browser.style.display = browser.style.display === 'none' ? 'block' : 'none';
+            if (browser.style.display === 'block') {
+                mappingBrowserPath = document.getElementById('mapping-path').value || '/storage';
+                await browseMappingPath(mappingBrowserPath);
+            }
+        }
+        
+        async function browseMappingPath(path) {
+            const data = await api('browse_local', 'POST', { path });
+            mappingBrowserPath = data.current;
+            
+            const list = document.getElementById('mapping-folder-list');
+            let html = `<div style="padding: 0.5rem; border-bottom: 1px solid var(--jf-border); background: var(--jf-bg-card); font-size: 0.8rem; color: var(--jf-text-muted);">${data.current}</div>`;
+            
+            if (data.parent) {
+                html += `<div class="server-item" style="padding: 0.5rem; cursor: pointer;" onclick="browseMappingPath('${data.parent}')">
+                    <span style="margin-right: 0.5rem;">⬆️</span> ..
+                </div>`;
+            }
+            
+            data.folders.forEach(folder => {
+                const fullPath = data.current === '/' ? `/${folder}` : `${data.current}/${folder}`;
+                html += `<div class="server-item" style="padding: 0.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onmouseover="this.style.background='var(--jf-bg-card-hover)'" onmouseout="this.style.background=''">
+                    <span onclick="browseMappingPath('${fullPath}')" style="flex: 1; display: flex; align-items: center;">
+                        <span style="margin-right: 0.5rem;">📁</span> ${folder}
+                    </span>
+                    <button class="btn btn-sm btn-primary" onclick="selectMappingPath('${fullPath}')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Select</button>
+                </div>`;
+            });
+            
+            // Add select current folder button
+            html += `<div style="padding: 0.5rem; border-top: 1px solid var(--jf-border);">
+                <button class="btn btn-primary btn-sm" onclick="selectMappingPath('${data.current}')" style="width: 100%;">Select This Folder</button>
+            </div>`;
+            
+            list.innerHTML = html;
+        }
+        
+        function selectMappingPath(path) {
+            document.getElementById('mapping-path').value = path;
+            document.getElementById('mapping-folder-browser').style.display = 'none';
         }
 
         // Status Polling

@@ -19,7 +19,7 @@ CONFIG_FILE = '/config/looter_config.json'
 CACHE_FILE = '/config/local_cache.json'
 AUTH_FILE = '/config/auth.json'
 
-VERSION = "2.3.0"
+VERSION = "2.4.1"
 
 app = Flask(__name__, static_folder='static')
 
@@ -32,6 +32,7 @@ download_lock = threading.Lock()
 worker_lock = threading.Lock()
 is_paused = False
 log_buffer = []
+download_history = []  # Completed downloads history
 local_id_cache = set()
 cache_timestamp = "Never"
 scan_progress = {
@@ -105,7 +106,7 @@ TRANSLATIONS = {
         'order_random': 'Random',
         'confirmed_working': 'Confirmed working on Unraid 7.2.0',
         'support_project': 'Support the Project',
-        'buy_coffee': 'Buy Me a Coffee',
+        'buy_coffee': 'Support on Ko-fi',
         'loading': 'Loading...',
         'error': 'Error',
         'success': 'Success',
@@ -131,6 +132,123 @@ TRANSLATIONS = {
         'failed': 'Failed',
         'paused': 'Paused',
         'starting': 'Starting',
+        'remote_browser': 'Remote Browser',
+        'select_all': 'Select All',
+        'deselect_all': 'Deselect All',
+        'download_selected': 'Download Selected',
+        'clear': 'Clear',
+        'filter_items': '🔍 Filter items...',
+        'activity_log': 'Activity Log',
+        'history': 'History',
+        'download_queue': 'Download Queue',
+        'active': 'Active',
+        'pending': 'Pending',
+        'cached': 'Cached',
+        'appearance': 'Appearance',
+        'dark_theme': 'Dark Theme',
+        'library_mappings': 'Library Mappings',
+        'add_mapping': 'Add Mapping',
+        'save_settings': 'Save Settings',
+        'test_connection': 'Test Connection',
+        'connection_successful': 'Connection successful',
+        'no_mappings': 'No Mappings',
+        'no_mappings_desc': 'Create a mapping to automatically sync content from remote libraries.',
+        'sync_now': 'Sync Now',
+        'auto_sync': 'Auto-Sync',
+        'configuration': 'Configuration',
+        'theme_hint': 'Switch between dark and light themes',
+        'language_hint': 'Interface language (page will refresh)',
+        'add_remote_server': 'Add Remote Server',
+        'duplicate_detection': 'Duplicate Detection',
+        'no_local_server': 'No local server configured. Add one to detect existing content.',
+        'configure_local': 'Configure Local Server',
+        'advanced_settings': 'Advanced Settings',
+        'speed_limit_hint': 'Set to 0 for unlimited speed',
+        'sync_time': 'Sync Time',
+        'connection_timeout': 'Connection Timeout (s)',
+        'chunk_size': 'Chunk Size (KB)',
+        'confirm_downloads': 'Confirm before downloading',
+        'show_notifications': 'Show notifications',
+        'select_server': 'Select Server...',
+        'no_active_downloads': 'No active downloads',
+        'last_scan': 'Last Scan',
+        'scanning': 'Scanning local library...',
+        'select_a_server': 'Select a Server',
+        'select_server_desc': 'Choose a remote server from the dropdown to browse its library.',
+        # Changelog translations
+        'support_btn': 'Support',
+        'back': 'Back',
+        'enjoying_jellylooter': 'Enjoying JellyLooter?',
+        'support_message': 'If this project saves you time, consider supporting on Ko-fi!',
+        'december': 'December',
+        'latest': 'Latest',
+        'fix': 'Fix',
+        'new': 'New',
+        'improve': 'Improve',
+        'ch_mobile_view': 'Mobile view now works correctly with hamburger menu',
+        'ch_download_error': 'Fixed download errors with username/password auth',
+        'ch_poster_aspect': 'Fixed poster image aspect ratio',
+        'ch_language_selector': 'Language selector in settings with full UI translations',
+        'ch_title_downloads': 'Download count shown in browser tab title',
+        'ch_select_all': 'Select All / Deselect All button for bulk selection',
+        'ch_filter': 'Filter/search box to find items in current view',
+        'ch_history': 'Download history panel with timestamps',
+        'ch_eta': 'Estimated time remaining on active downloads',
+        'ch_quick_paths': 'Quick path selection from library mappings when downloading',
+        'ch_auth_optional': 'Authentication now optional (off by default)',
+        'ch_tooltip': 'Tooltip z-index fixed',
+        'ch_pagination': 'All items now display with server-side pagination',
+        'ch_responsive': 'Mobile-friendly responsive design',
+        'ch_grid_list': 'Grid/List view toggle',
+        'ch_items_page': 'Pagination with configurable items per page',
+        'ch_queue_order': 'Download queue ordering options',
+        'ch_multilang': 'Multi-language support (English, Spanish, German)',
+        'ch_syntax': 'Python syntax errors fixed',
+        'ch_favicon': 'Added favicon',
+        'ch_kofi': 'Ko-fi support links',
+        'ch_userpw': 'Username/password authentication support',
+        'ch_queue_visible': 'Download queue visibility improvements',
+        'ch_ux': 'User experience improvements',
+        # Help translations
+        'help_support': 'Help & Support',
+        'support_jellylooter': 'Support JellyLooter',
+        'verified': 'VERIFIED',
+        'confirmed_working': 'Confirmed working on',
+        'quick_tips': 'Quick Tips',
+        'tip_multiselect': 'Multi-Select Items',
+        'tip_multiselect_desc': 'Hold Ctrl/Cmd and click to select multiple items, or just click non-folder items to toggle selection.',
+        'tip_speed': 'Speed Limit Updates Live',
+        'tip_speed_desc': 'Change speed limit in settings and it applies to active downloads within 10 seconds.',
+        'tip_order': 'Download Order',
+        'tip_order_desc': 'Choose how items are queued: complete shows first, round-robin by season/episode, or alphabetically.',
+        'tip_mappings': 'Library Mappings',
+        'tip_mappings_desc': 'Set up mappings to sync entire libraries automatically. Maps remote libraries to local folders.',
+        'tip_language': 'Change Language',
+        'tip_language_desc': 'Go to Settings > Appearance > Language to switch between English, Spanish, and German.',
+        'troubleshooting': 'Troubleshooting',
+        'issue_auth': 'Authentication Issues',
+        'issue_auth_desc': 'If using username/password auth, try deleting and re-adding the server. The user_id must be stored correctly.',
+        'issue_slow': 'Slow Downloads',
+        'issue_slow_desc': 'Check your speed limit setting. Set to 0 for unlimited. Also check network connection to remote server.',
+        'issue_error': 'Download Errors',
+        'issue_error_desc': 'Check the Activity Log for details. Common issues: disk full, permissions, network timeout.',
+        'no_remote_servers': 'No remote servers configured yet.',
+        'confirm_remove_local': 'Remove local server?',
+        'local_server_removed': 'Local server removed',
+        'unknown': 'Unknown',
+        'library': 'Library',
+        'server_name': 'Server Name',
+        'server_url': 'Server URL',
+        'auth_method': 'Authentication Method',
+        'api_key': 'API Key',
+        'username_password': 'Username/Password',
+        'test_before_adding': '⚠️ Test the connection before adding the server',
+        'cancel': 'Cancel',
+        'add_server': 'Add Server',
+        'save_and_scan': 'Save & Scan',
+        'select_download_location': 'Select Download Location',
+        'or_browse': 'Or browse to a folder:',
+        'download_here': 'Download Here',
     },
     'es': {
         'app_name': 'JellyLooter',
@@ -188,7 +306,7 @@ TRANSLATIONS = {
         'order_random': 'Aleatorio',
         'confirmed_working': 'Confirmado funcionando en Unraid 7.2.0',
         'support_project': 'Apoya el Proyecto',
-        'buy_coffee': 'Invítame un Café',
+        'buy_coffee': 'Apoyar en Ko-fi',
         'loading': 'Cargando...',
         'error': 'Error',
         'success': 'Éxito',
@@ -214,6 +332,123 @@ TRANSLATIONS = {
         'failed': 'Fallido',
         'paused': 'Pausado',
         'starting': 'Iniciando',
+        'remote_browser': 'Explorador Remoto',
+        'select_all': 'Seleccionar Todo',
+        'deselect_all': 'Deseleccionar Todo',
+        'download_selected': 'Descargar Seleccionados',
+        'clear': 'Limpiar',
+        'filter_items': '🔍 Filtrar elementos...',
+        'activity_log': 'Registro de Actividad',
+        'history': 'Historial',
+        'download_queue': 'Cola de Descargas',
+        'active': 'Activo',
+        'pending': 'Pendiente',
+        'cached': 'En Caché',
+        'appearance': 'Apariencia',
+        'dark_theme': 'Tema Oscuro',
+        'library_mappings': 'Mapeo de Bibliotecas',
+        'add_mapping': 'Agregar Mapeo',
+        'save_settings': 'Guardar Configuración',
+        'test_connection': 'Probar Conexión',
+        'connection_successful': 'Conexión exitosa',
+        'no_mappings': 'Sin Mapeos',
+        'no_mappings_desc': 'Crea un mapeo para sincronizar contenido automáticamente.',
+        'sync_now': 'Sincronizar Ahora',
+        'auto_sync': 'Auto-Sincronización',
+        'configuration': 'Configuración',
+        'theme_hint': 'Cambiar entre tema oscuro y claro',
+        'language_hint': 'Idioma de la interfaz (la página se recargará)',
+        'add_remote_server': 'Agregar Servidor Remoto',
+        'duplicate_detection': 'Detección de Duplicados',
+        'no_local_server': 'No hay servidor local configurado. Agrega uno para detectar contenido existente.',
+        'configure_local': 'Configurar Servidor Local',
+        'advanced_settings': 'Configuración Avanzada',
+        'speed_limit_hint': 'Establecer en 0 para velocidad ilimitada',
+        'sync_time': 'Hora de Sincronización',
+        'connection_timeout': 'Tiempo de Espera (s)',
+        'chunk_size': 'Tamaño de Bloque (KB)',
+        'confirm_downloads': 'Confirmar antes de descargar',
+        'show_notifications': 'Mostrar notificaciones',
+        'select_server': 'Seleccionar Servidor...',
+        'no_active_downloads': 'No hay descargas activas',
+        'last_scan': 'Último Escaneo',
+        'scanning': 'Escaneando biblioteca local...',
+        'select_a_server': 'Seleccionar un Servidor',
+        'select_server_desc': 'Elige un servidor remoto del menú desplegable para explorar su biblioteca.',
+        # Changelog translations
+        'support_btn': 'Apoyar',
+        'back': 'Volver',
+        'enjoying_jellylooter': '¿Te gusta JellyLooter?',
+        'support_message': '¡Si este proyecto te ahorra tiempo, considera apoyar en Ko-fi!',
+        'december': 'Diciembre',
+        'latest': 'Última',
+        'fix': 'Corr',
+        'new': 'Nuevo',
+        'improve': 'Mejor',
+        'ch_mobile_view': 'Vista móvil ahora funciona correctamente con menú hamburguesa',
+        'ch_download_error': 'Corregidos errores de descarga con autenticación usuario/contraseña',
+        'ch_poster_aspect': 'Corregida proporción de imágenes de póster',
+        'ch_language_selector': 'Selector de idioma en configuración con traducciones completas',
+        'ch_title_downloads': 'Contador de descargas en la pestaña del navegador',
+        'ch_select_all': 'Botón Seleccionar Todo / Deseleccionar Todo',
+        'ch_filter': 'Cuadro de filtro/búsqueda para encontrar elementos',
+        'ch_history': 'Panel de historial de descargas con marcas de tiempo',
+        'ch_eta': 'Tiempo estimado restante en descargas activas',
+        'ch_quick_paths': 'Selección rápida de ruta desde mapeos de biblioteca',
+        'ch_auth_optional': 'Autenticación ahora opcional (desactivada por defecto)',
+        'ch_tooltip': 'Corregido z-index de tooltip',
+        'ch_pagination': 'Todos los elementos ahora se muestran con paginación',
+        'ch_responsive': 'Diseño responsive para móviles',
+        'ch_grid_list': 'Cambio entre vista de cuadrícula/lista',
+        'ch_items_page': 'Paginación con elementos por página configurables',
+        'ch_queue_order': 'Opciones de orden de cola de descarga',
+        'ch_multilang': 'Soporte multiidioma (inglés, español, alemán)',
+        'ch_syntax': 'Errores de sintaxis Python corregidos',
+        'ch_favicon': 'Añadido favicon',
+        'ch_kofi': 'Enlaces de soporte Ko-fi',
+        'ch_userpw': 'Soporte de autenticación usuario/contraseña',
+        'ch_queue_visible': 'Mejoras de visibilidad de cola de descarga',
+        'ch_ux': 'Mejoras de experiencia de usuario',
+        # Help translations
+        'help_support': 'Ayuda y Soporte',
+        'support_jellylooter': 'Apoyar JellyLooter',
+        'verified': 'VERIFICADO',
+        'confirmed_working': 'Confirmado funcionando en',
+        'quick_tips': 'Consejos Rápidos',
+        'tip_multiselect': 'Selección Múltiple',
+        'tip_multiselect_desc': 'Mantén Ctrl/Cmd y haz clic para seleccionar múltiples elementos, o simplemente haz clic en elementos que no sean carpetas.',
+        'tip_speed': 'Límite de Velocidad en Vivo',
+        'tip_speed_desc': 'Cambia el límite de velocidad en configuración y se aplica a las descargas activas en 10 segundos.',
+        'tip_order': 'Orden de Descarga',
+        'tip_order_desc': 'Elige cómo se ordenan los elementos: series completas primero, round-robin por temporada/episodio, o alfabéticamente.',
+        'tip_mappings': 'Mapeos de Biblioteca',
+        'tip_mappings_desc': 'Configura mapeos para sincronizar bibliotecas enteras automáticamente.',
+        'tip_language': 'Cambiar Idioma',
+        'tip_language_desc': 'Ve a Configuración > Apariencia > Idioma para cambiar entre inglés, español y alemán.',
+        'troubleshooting': 'Solución de Problemas',
+        'issue_auth': 'Problemas de Autenticación',
+        'issue_auth_desc': 'Si usas autenticación usuario/contraseña, intenta eliminar y volver a agregar el servidor.',
+        'issue_slow': 'Descargas Lentas',
+        'issue_slow_desc': 'Revisa tu límite de velocidad. Establece en 0 para ilimitado. También verifica la conexión de red.',
+        'issue_error': 'Errores de Descarga',
+        'issue_error_desc': 'Revisa el Registro de Actividad para detalles. Problemas comunes: disco lleno, permisos, tiempo de espera.',
+        'no_remote_servers': 'No hay servidores remotos configurados.',
+        'confirm_remove_local': '¿Eliminar servidor local?',
+        'local_server_removed': 'Servidor local eliminado',
+        'unknown': 'Desconocido',
+        'library': 'Biblioteca',
+        'server_name': 'Nombre del Servidor',
+        'server_url': 'URL del Servidor',
+        'auth_method': 'Método de Autenticación',
+        'api_key': 'Clave API',
+        'username_password': 'Usuario/Contraseña',
+        'test_before_adding': '⚠️ Prueba la conexión antes de agregar el servidor',
+        'cancel': 'Cancelar',
+        'add_server': 'Agregar Servidor',
+        'save_and_scan': 'Guardar y Escanear',
+        'select_download_location': 'Seleccionar Ubicación de Descarga',
+        'or_browse': 'O navegar a una carpeta:',
+        'download_here': 'Descargar Aquí',
     },
     'de': {
         'app_name': 'JellyLooter',
@@ -271,7 +506,7 @@ TRANSLATIONS = {
         'order_random': 'Zufällig',
         'confirmed_working': 'Bestätigt funktionierend auf Unraid 7.2.0',
         'support_project': 'Projekt unterstützen',
-        'buy_coffee': 'Kauf mir einen Kaffee',
+        'buy_coffee': 'Auf Ko-fi unterstützen',
         'loading': 'Laden...',
         'error': 'Fehler',
         'success': 'Erfolg',
@@ -297,6 +532,123 @@ TRANSLATIONS = {
         'failed': 'Fehlgeschlagen',
         'paused': 'Pausiert',
         'starting': 'Startet',
+        'remote_browser': 'Remote-Browser',
+        'select_all': 'Alle auswählen',
+        'deselect_all': 'Alle abwählen',
+        'download_selected': 'Ausgewählte herunterladen',
+        'clear': 'Leeren',
+        'filter_items': '🔍 Elemente filtern...',
+        'activity_log': 'Aktivitätsprotokoll',
+        'history': 'Verlauf',
+        'download_queue': 'Download-Warteschlange',
+        'active': 'Aktiv',
+        'pending': 'Ausstehend',
+        'cached': 'Gecached',
+        'appearance': 'Darstellung',
+        'dark_theme': 'Dunkles Design',
+        'library_mappings': 'Bibliothekszuordnungen',
+        'add_mapping': 'Zuordnung hinzufügen',
+        'save_settings': 'Einstellungen speichern',
+        'test_connection': 'Verbindung testen',
+        'connection_successful': 'Verbindung erfolgreich',
+        'no_mappings': 'Keine Zuordnungen',
+        'no_mappings_desc': 'Erstellen Sie eine Zuordnung, um Inhalte automatisch zu synchronisieren.',
+        'sync_now': 'Jetzt synchronisieren',
+        'auto_sync': 'Auto-Sync',
+        'configuration': 'Konfiguration',
+        'theme_hint': 'Zwischen hellem und dunklem Design wechseln',
+        'language_hint': 'Schnittstellensprache (Seite wird neu geladen)',
+        'add_remote_server': 'Remote-Server hinzufügen',
+        'duplicate_detection': 'Duplikaterkennung',
+        'no_local_server': 'Kein lokaler Server konfiguriert. Fügen Sie einen hinzu, um vorhandene Inhalte zu erkennen.',
+        'configure_local': 'Lokalen Server konfigurieren',
+        'advanced_settings': 'Erweiterte Einstellungen',
+        'speed_limit_hint': 'Auf 0 setzen für unbegrenzte Geschwindigkeit',
+        'sync_time': 'Sync-Zeit',
+        'connection_timeout': 'Verbindungs-Timeout (s)',
+        'chunk_size': 'Blockgröße (KB)',
+        'confirm_downloads': 'Vor dem Download bestätigen',
+        'show_notifications': 'Benachrichtigungen anzeigen',
+        'select_server': 'Server auswählen...',
+        'no_active_downloads': 'Keine aktiven Downloads',
+        'last_scan': 'Letzter Scan',
+        'scanning': 'Lokale Bibliothek wird gescannt...',
+        'select_a_server': 'Server auswählen',
+        'select_server_desc': 'Wählen Sie einen Remote-Server aus der Dropdown-Liste, um seine Bibliothek zu durchsuchen.',
+        # Changelog translations
+        'support_btn': 'Unterstützen',
+        'back': 'Zurück',
+        'enjoying_jellylooter': 'Gefällt Ihnen JellyLooter?',
+        'support_message': 'Wenn dieses Projekt Ihnen Zeit spart, unterstützen Sie es auf Ko-fi!',
+        'december': 'Dezember',
+        'latest': 'Neueste',
+        'fix': 'Fix',
+        'new': 'Neu',
+        'improve': 'Besser',
+        'ch_mobile_view': 'Mobile Ansicht funktioniert jetzt korrekt mit Hamburger-Menü',
+        'ch_download_error': 'Download-Fehler mit Benutzername/Passwort-Auth behoben',
+        'ch_poster_aspect': 'Poster-Bildverhältnis korrigiert',
+        'ch_language_selector': 'Sprachauswahl in Einstellungen mit vollständigen Übersetzungen',
+        'ch_title_downloads': 'Download-Zähler im Browser-Tab-Titel',
+        'ch_select_all': 'Alle auswählen / Abwählen Schaltfläche',
+        'ch_filter': 'Filter-/Suchfeld zum Finden von Elementen',
+        'ch_history': 'Download-Verlauf mit Zeitstempeln',
+        'ch_eta': 'Geschätzte Restzeit bei aktiven Downloads',
+        'ch_quick_paths': 'Schnelle Pfadauswahl aus Bibliothekszuordnungen',
+        'ch_auth_optional': 'Authentifizierung jetzt optional (standardmäßig deaktiviert)',
+        'ch_tooltip': 'Tooltip z-index behoben',
+        'ch_pagination': 'Alle Elemente werden jetzt mit Paginierung angezeigt',
+        'ch_responsive': 'Mobilfreundliches responsives Design',
+        'ch_grid_list': 'Raster-/Listenansicht-Umschalter',
+        'ch_items_page': 'Paginierung mit konfigurierbaren Elementen pro Seite',
+        'ch_queue_order': 'Download-Warteschlangen-Sortieroptionen',
+        'ch_multilang': 'Mehrsprachige Unterstützung (Englisch, Spanisch, Deutsch)',
+        'ch_syntax': 'Python-Syntaxfehler behoben',
+        'ch_favicon': 'Favicon hinzugefügt',
+        'ch_kofi': 'Ko-fi Support-Links',
+        'ch_userpw': 'Benutzername/Passwort-Authentifizierung',
+        'ch_queue_visible': 'Verbesserungen der Download-Warteschlangen-Sichtbarkeit',
+        'ch_ux': 'Verbesserungen der Benutzererfahrung',
+        # Help translations
+        'help_support': 'Hilfe & Support',
+        'support_jellylooter': 'JellyLooter unterstützen',
+        'verified': 'VERIFIZIERT',
+        'confirmed_working': 'Bestätigt funktionierend auf',
+        'quick_tips': 'Schnelle Tipps',
+        'tip_multiselect': 'Mehrfachauswahl',
+        'tip_multiselect_desc': 'Halten Sie Strg/Cmd und klicken Sie, um mehrere Elemente auszuwählen.',
+        'tip_speed': 'Geschwindigkeitslimit Live',
+        'tip_speed_desc': 'Ändern Sie das Geschwindigkeitslimit in den Einstellungen und es wird innerhalb von 10 Sekunden angewendet.',
+        'tip_order': 'Download-Reihenfolge',
+        'tip_order_desc': 'Wählen Sie, wie Elemente eingereiht werden: komplette Serien zuerst, Round-Robin, oder alphabetisch.',
+        'tip_mappings': 'Bibliothekszuordnungen',
+        'tip_mappings_desc': 'Richten Sie Zuordnungen ein, um ganze Bibliotheken automatisch zu synchronisieren.',
+        'tip_language': 'Sprache ändern',
+        'tip_language_desc': 'Gehen Sie zu Einstellungen > Darstellung > Sprache, um zwischen Englisch, Spanisch und Deutsch zu wechseln.',
+        'troubleshooting': 'Fehlerbehebung',
+        'issue_auth': 'Authentifizierungsprobleme',
+        'issue_auth_desc': 'Bei Benutzername/Passwort-Auth versuchen Sie, den Server zu löschen und neu hinzuzufügen.',
+        'issue_slow': 'Langsame Downloads',
+        'issue_slow_desc': 'Überprüfen Sie Ihr Geschwindigkeitslimit. Setzen Sie es auf 0 für unbegrenzt.',
+        'issue_error': 'Download-Fehler',
+        'issue_error_desc': 'Überprüfen Sie das Aktivitätsprotokoll für Details. Häufige Probleme: Festplatte voll, Berechtigungen, Timeout.',
+        'no_remote_servers': 'Keine Remote-Server konfiguriert.',
+        'confirm_remove_local': 'Lokalen Server entfernen?',
+        'local_server_removed': 'Lokaler Server entfernt',
+        'unknown': 'Unbekannt',
+        'library': 'Bibliothek',
+        'server_name': 'Servername',
+        'server_url': 'Server-URL',
+        'auth_method': 'Authentifizierungsmethode',
+        'api_key': 'API-Schlüssel',
+        'username_password': 'Benutzername/Passwort',
+        'test_before_adding': '⚠️ Testen Sie die Verbindung bevor Sie den Server hinzufügen',
+        'cancel': 'Abbrechen',
+        'add_server': 'Server hinzufügen',
+        'save_and_scan': 'Speichern & Scannen',
+        'select_download_location': 'Download-Speicherort auswählen',
+        'or_browse': 'Oder zu einem Ordner navigieren:',
+        'download_here': 'Hier herunterladen',
     }
 }
 
@@ -864,6 +1216,7 @@ def download_file(task):
                                 active_downloads[tid].update({
                                     'current': downloaded,
                                     'speed': f"{format_bytes(speed)}/s",
+                                    'speed_raw': speed,  # Raw bytes/sec for ETA calc
                                     'status': 'Downloading',
                                     'percent': int((downloaded / total_size) * 100) if total_size > 0 else 0
                                 })
@@ -873,6 +1226,18 @@ def download_file(task):
             if tid in active_downloads:
                 del active_downloads[tid]
         log(f"✓ Completed: {filename}")
+        
+        # Add to download history
+        with download_lock:
+            download_history.insert(0, {
+                'filename': filename,
+                'size': total_size,
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'path': filepath
+            })
+            # Keep only last 100 items
+            if len(download_history) > 100:
+                download_history.pop()
         
     except InterruptedError:
         log(f"✗ Cancelled: {filename}")
@@ -1157,8 +1522,10 @@ def index():
 @login_required
 def changelog():
     cfg = load_config()
+    lang = cfg.get('language', 'en')
     return render_template('changelog.html', 
-                           lang=cfg.get('language', 'en'),
+                           lang=lang,
+                           t=get_all_translations(lang),
                            version=VERSION)
 
 
@@ -1166,8 +1533,10 @@ def changelog():
 @login_required
 def help_page():
     cfg = load_config()
+    lang = cfg.get('language', 'en')
     return render_template('help.html', 
-                           lang=cfg.get('language', 'en'),
+                           lang=lang,
+                           t=get_all_translations(lang),
                            version=VERSION)
 
 
@@ -1210,6 +1579,13 @@ def status():
 def get_logs():
     with download_lock:
         return "\n".join(reversed(log_buffer))
+
+
+@app.route('/api/history')
+@login_required
+def get_history():
+    with download_lock:
+        return jsonify(download_history[:50])  # Return last 50
 
 
 @app.route('/api/pause', methods=['POST'])
@@ -1504,24 +1880,14 @@ def browse_remote():
                 # Check what image types are available
                 image_tags = item.get('ImageTags', {})
                 has_primary = 'Primary' in image_tags
-                has_thumb = 'Thumb' in image_tags
-                has_backdrop = 'Backdrop' in image_tags or item.get('BackdropImageTags', [])
                 
-                # Determine best image type to use (prefer Primary for posters)
-                image_type = None
-                if has_primary:
-                    image_type = 'Primary'
-                elif has_thumb:
-                    image_type = 'Thumb'
-                elif has_backdrop:
-                    image_type = 'Backdrop'
-                
+                # Always try Primary first - it's the poster image
+                # If not available, the frontend will show placeholder
                 clean_items.append({
                     "Id": item['Id'],
                     "Name": item['Name'],
                     "IsFolder": is_folder,
-                    "HasImage": image_type is not None,
-                    "ImageType": image_type,
+                    "HasPrimary": has_primary,
                     "ExistsLocally": exists,
                     "Type": item.get('Type', 'Unknown'),
                     "SeriesName": item.get('SeriesName'),
@@ -1609,20 +1975,55 @@ def recursive_resolve(server, item_id, base_path, tid, limit, download_order='li
     
     try:
         headers = get_auth_header(server['key'])
-        user_id = requests.get(
-            f"{server['url']}/Users",
-            headers=headers
-        ).json()[0]['Id']
         
-        item = requests.get(
+        # Use stored user_id if available (for username/password auth)
+        user_id = server.get('user_id')
+        log(f"Using user ID: {user_id}")
+        log(f"Using headers: {list(headers.keys())}")
+        
+        if not user_id:
+            # Try to get user_id from /Users endpoint (may fail with non-admin auth)
+            try:
+                users_resp = requests.get(
+                    f"{server['url']}/Users",
+                    headers=headers,
+                    timeout=10
+                )
+                if users_resp.status_code == 200:
+                    user_id = users_resp.json()[0]['Id']
+                else:
+                    log(f"Users endpoint returned {users_resp.status_code}, trying /Users/Me")
+                    # Fallback: try /Users/Me endpoint
+                    me_resp = requests.get(
+                        f"{server['url']}/Users/Me",
+                        headers=headers,
+                        timeout=10
+                    )
+                    if me_resp.status_code == 200:
+                        user_id = me_resp.json()['Id']
+                    else:
+                        raise Exception(f"Cannot get user ID: /Users returned {users_resp.status_code}, /Users/Me returned {me_resp.status_code}")
+            except Exception as e:
+                log(f"Error getting user ID: {e}")
+                raise
+        
+        log(f"Fetching item {item_id} for user {user_id}")
+        item_resp = requests.get(
             f"{server['url']}/Users/{user_id}/Items/{item_id}",
-            headers=headers
-        ).json()
+            headers=headers,
+            timeout=15
+        )
+        
+        if item_resp.status_code != 200:
+            log(f"Item request failed: {item_resp.status_code} - {item_resp.text[:200]}")
+            raise Exception(f"Item request returned {item_resp.status_code}")
+        
+        item = item_resp.json()
         
         container_types = ['Series', 'Season', 'BoxSet', 'Folder', 'CollectionFolder']
         
         if item['Type'] in container_types:
-            children = requests.get(
+            children_resp = requests.get(
                 f"{server['url']}/Users/{user_id}/Items",
                 headers=headers,
                 params={
@@ -1630,8 +2031,15 @@ def recursive_resolve(server, item_id, base_path, tid, limit, download_order='li
                     'Recursive': 'true',
                     'IncludeItemTypes': 'Movie,Episode',
                     'Fields': 'ProviderIds'
-                }
-            ).json().get('Items', [])
+                },
+                timeout=30
+            )
+            
+            if children_resp.status_code != 200:
+                log(f"Children request failed: {children_resp.status_code}")
+                raise Exception(f"Children request returned {children_resp.status_code}")
+            
+            children = children_resp.json().get('Items', [])
             
             with download_lock:
                 pending_display = [x for x in pending_display if x['id'] != tid]

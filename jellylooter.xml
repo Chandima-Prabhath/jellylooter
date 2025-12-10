@@ -33,7 +33,7 @@ Confirmed working on Unraid 7.2.0</Overview>
   <CPUset/>
   <DateInstalled></DateInstalled>
   <DonateText>Buy Me a Coffee</DonateText>
-  <DonateLink>https://buymeacoffee.com/friendlymedia</DonateLink>
+  <DonateLink>https://ko-fi.com/jellyloot</DonateLink>
   <Requires/>
   <Config Name="Web UI Port" Target="5000" Default="5000" Mode="tcp" Description="Port for the web interface" Type="Port" Display="always" Required="true" Mask="false">5000</Config>
   <Config Name="Config Path" Target="/config" Default="/mnt/user/appdata/jellylooter" Mode="rw" Description="Path to store configuration files" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/jellylooter</Config>

@@ -12,11 +12,11 @@ Built by Friendly Media — because your friends' Jellyfin libraries aren't goin
 
 | Browse Library | Download Queue | Settings |
 |----------------|----------------|----------|
-| ![Browse](https://raw.githubusercontent.com/friendlymedia/jellylooter/main/screenshots/browse.png) | ![Queue](https://raw.githubusercontent.com/friendlymedia/jellylooter/main/screenshots/queue.png) | ![Settings](https://raw.githubusercontent.com/friendlymedia/jellylooter/main/screenshots/settings.png) |
+| ![Browse](https://github.com/jlightner86/jellylooter/blob/main/screenshots/browse.png) | ![Queue](https://github.com/jlightner86/jellylooter/blob/main/screenshots/queue.png) | ![Settings](https://github.com/jlightner86/jellylooter/blob/main/screenshots/settings.png) |
 
 | Rating Overlays | Quality Badges | Pro Features |
 |-----------------|----------------|--------------|
-| ![Ratings](https://raw.githubusercontent.com/friendlymedia/jellylooter/main/screenshots/ratings.png) | ![Quality](https://raw.githubusercontent.com/friendlymedia/jellylooter/main/screenshots/quality.png) | ![Pro](https://raw.githubusercontent.com/friendlymedia/jellylooter/main/screenshots/pro.png) |
+| ![Ratings](https://github.com/jlightner86/jellylooter/blob/main/screenshots/ratings.png) | ![Quality](https://github.com/jlightner86/jellylooter/blob/main/screenshots/quality.png) | ![Pro](https://github.com/jlightner86/jellylooter/blob/main/screenshots/pro.png) |
 
 ---
 

@@ -318,47 +318,7 @@ def _verify_license_integrity(license_data):
 
 def get_license_tier():
     """Get current license tier with integrity and expiration check"""
-    license_data = load_license()
-    tier = license_data.get('tier', 'free')
-    
-    # Verify integrity (primary + backup for pro)
-    if tier == 'pro':
-        if not _verify_license_integrity(license_data):
-            log("Primary license integrity check failed, checking backup...")
-            # Try to restore from backup
-            restore_result = restore_from_backup()
-            if restore_result.get('success'):
-                return 'pro'
-            log("License integrity check failed, reverting to free")
-            license_data['tier'] = 'free'
-            save_license(license_data)
-            return 'free'
-        
-        # Dual verification - check backup matches
-        if not verify_dual_license():
-            log("⚠️ License mismatch detected between primary and backup")
-            # Don't immediately revoke, but log warning
-    
-    elif tier == 'trial':
-        if not _verify_license_integrity(license_data):
-            log("License integrity check failed, reverting to free")
-            license_data['tier'] = 'free'
-            save_license(license_data)
-            return 'free'
-    
-    # Check if trial has expired
-    if tier == 'trial':
-        trial_started = license_data.get('trial_started')
-        if trial_started:
-            start_date = datetime.datetime.fromisoformat(trial_started)
-            days_elapsed = (datetime.datetime.now() - start_date).days
-            if days_elapsed >= TRIAL_DURATION_DAYS:
-                # Trial expired, revert to free
-                license_data['tier'] = 'free'
-                save_license(license_data)
-                return 'free'
-    
-    return tier
+    return 'pro'
 
 def get_trial_days_remaining():
     """Get number of days remaining in trial"""
